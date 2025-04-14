@@ -17,7 +17,7 @@ def load_tokenized_data(
     Using this function ensures we are using the same tokens everywhere.
     """
     from datasets import load_dataset
-    from sparsify.data import chunk_and_tokenize
+    from sparsify.sparsify.data import chunk_and_tokenize
 
     data = load_dataset(dataset_repo, name=dataset_name, split=dataset_split)
     data = data.shuffle(seed)

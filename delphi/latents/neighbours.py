@@ -6,7 +6,7 @@ from typing import Literal, Optional
 import numpy as np
 import torch
 from safetensors.numpy import load_file
-from sparsify import Sae
+from sparsify.sparsify import Sae
 from torch import nn
 from tqdm import tqdm
 

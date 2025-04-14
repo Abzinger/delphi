@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Callable
 
 import torch
-from sparsify import SparseCoder
+from sparsify.sparsify import SparseCoder
 from torch import Tensor
 from transformers import PreTrainedModel
 
