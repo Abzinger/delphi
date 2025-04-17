@@ -279,7 +279,6 @@ class LatentCache:
                             )
                             self.cache.add(sae_latents, batch, batch_number, hookpoint)
                             firing_counts = (sae_latents > 0).sum((0, 1))
-                            print(f"before if Width: {self.width}")
                             if self.width is None:
                                 self.width = sae_latents.shape[2]
 
