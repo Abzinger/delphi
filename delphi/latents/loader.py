@@ -12,7 +12,7 @@ from safetensors.numpy import load_file
 from torch import Tensor
 from transformers import AutoTokenizer, PreTrainedTokenizer, PreTrainedTokenizerFast
 
-from delphi.utils import (
+from delphi.delphi.utils import (
     load_tokenized_data,
 )
 

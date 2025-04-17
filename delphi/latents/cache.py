@@ -12,8 +12,8 @@ from torch import Tensor
 from tqdm import tqdm
 from transformers import PreTrainedModel
 
-from delphi.config import CacheConfig
-from delphi.latents.collect_activations import collect_activations
+from delphi.delphi.config import CacheConfig
+from delphi.delphi.latents.collect_activations import collect_activations
 
 location_tensor_shape = Float[Tensor, "batch sequence num_latents"]
 token_tensor_shape = Float[Tensor, "batch sequence"]
@@ -279,6 +279,7 @@ class LatentCache:
                             )
                             self.cache.add(sae_latents, batch, batch_number, hookpoint)
                             firing_counts = (sae_latents > 0).sum((0, 1))
+                            print(f"before if Width: {self.width}")
                             if self.width is None:
                                 self.width = sae_latents.shape[2]
 
