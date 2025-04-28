@@ -1,4 +1,4 @@
-from typing import Any, Type, TypeVar, cast
+from typing import Any, Type, TypeVar, Optional, cast
 
 from transformers import PreTrainedTokenizer, PreTrainedTokenizerFast
 
@@ -10,6 +10,7 @@ def load_tokenized_data(
     dataset_split: str,
     dataset_name: str = "",
     column_name: str = "text",
+    cache_dir: Optional[str] = None,
     seed: int = 22,
 ):
     """
@@ -19,7 +20,8 @@ def load_tokenized_data(
     from datasets import load_dataset
     from sparsify.sparsify.data import chunk_and_tokenize
 
-    data = load_dataset(dataset_repo, name=dataset_name, split=dataset_split)
+    data = load_dataset(dataset_repo, name=dataset_name, split=dataset_split, 
+                        cache_dir=cache_dir)
     data = data.shuffle(seed)
     tokens_ds = chunk_and_tokenize(
         data,  # type: ignore
