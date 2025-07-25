@@ -1,7 +1,7 @@
 import asyncio
 
-from delphi.explainers.default.prompt_builder import build_single_token_prompt
-from delphi.explainers.explainer import Explainer
+from delphi.delphi.explainers.default.prompt_builder import build_single_token_prompt
+from delphi.delphi.explainers.explainer import Explainer
 
 
 class SingleTokenExplainer(Explainer):
