@@ -1,9 +1,10 @@
 from dataclasses import dataclass, field
-from typing import NamedTuple, Optional
+from typing import Literal, NamedTuple, Optional
 
 import blobfile as bf
 import orjson
-from jaxtyping import Float
+import torch
+from jaxtyping import Float, Int
 from torch import Tensor
 from transformers import PreTrainedTokenizer, PreTrainedTokenizerFast
 
@@ -35,7 +36,7 @@ class ActivationData(NamedTuple):
     Represents the activation data for a latent.
     """
 
-    locations: Float[Tensor, "n_examples 2"]
+    locations: Int[Tensor, "n_examples 3"]
     """Tensor of latent locations."""
 
     activations: Float[Tensor, "n_examples"]
@@ -69,17 +70,11 @@ class Example:
     A single example of latent data.
     """
 
-    tokens: Float[Tensor, "ctx_len"]
+    tokens: Int[Tensor, "ctx_len"]
     """Tokenized input sequence."""
 
     activations: Float[Tensor, "ctx_len"]
     """Activation values for the input sequence."""
-
-    str_tokens: list[str]
-    """Tokenized input sequence as strings."""
-
-    normalized_activations: Optional[Float[Tensor, "ctx_len"]] = None
-    """Activations quantized to integers in [0, 10]."""
 
     @property
     def max_activation(self) -> float:
@@ -98,6 +93,12 @@ class ActivatingExample(Example):
     An example of a latent that activates a model.
     """
 
+    normalized_activations: Optional[Float[Tensor, "ctx_len"]] = None
+    """Activations quantized to integers in [0, 10]."""
+
+    str_tokens: Optional[list[str]] = None
+    """Tokenized input sequence as strings."""
+
     quantile: int = 0
     """The quantile of the activating example."""
 
@@ -107,6 +108,9 @@ class NonActivatingExample(Example):
     """
     An example of a latent that does not activate a model.
     """
+
+    str_tokens: list[str]
+    """Tokenized input sequence as strings."""
 
     distance: float = 0.0
     """
@@ -125,7 +129,7 @@ class LatentRecord:
     """The latent associated with the record."""
 
     examples: list[ActivatingExample] = field(default_factory=list)
-    """Example sequences where the latent activations, assumed to be sorted in
+    """Example sequences where the latent activates, assumed to be sorted in
     descending order by max activation."""
 
     not_active: list[NonActivatingExample] = field(default_factory=list)
@@ -134,7 +138,7 @@ class LatentRecord:
     train: list[ActivatingExample] = field(default_factory=list)
     """Training examples."""
 
-    test: list[ActivatingExample] | list[list[Example]] = field(default_factory=list)
+    test: list[ActivatingExample] = field(default_factory=list)
     """Test examples."""
 
     neighbours: list[Neighbour] = field(default_factory=list)
@@ -145,6 +149,13 @@ class LatentRecord:
 
     extra_examples: Optional[list[Example]] = None
     """Extra examples to include in the record."""
+
+    per_token_frequency: float = 0.0
+    """Frequency of the latent. Number of activations per total number of tokens."""
+
+    per_context_frequency: float = 0.0
+    """Frequency of the latent. Number of activations in a context per total
+    number of contexts."""
 
     @property
     def max_activation(self) -> float:
@@ -193,6 +204,8 @@ class LatentRecord:
         tokenizer: PreTrainedTokenizer | PreTrainedTokenizerFast,
         threshold: float = 0.0,
         n: int = 10,
+        do_display: bool = True,
+        example_source: Literal["examples", "train", "test"] = "examples",
     ):
         """
         Display the latent record in a formatted string.
@@ -206,9 +219,8 @@ class LatentRecord:
         Returns:
             str: The formatted string.
         """
-        from IPython.core.display import HTML, display  # type: ignore
 
-        def _to_string(tokens: list[str], activations: Float[Tensor, "ctx_len"]) -> str:
+        def _to_string(toks, activations: Float[Tensor, "ctx_len"]) -> str:
             """
             Convert tokens and activations to a string.
 
@@ -219,28 +231,145 @@ class LatentRecord:
             Returns:
                 str: The formatted string.
             """
-            result = []
-            i = 0
+            text_spacing = "0.00em"
+            toks = convert_token_array_to_list(toks)
+            activations = convert_token_array_to_list(activations)
+            inverse_vocab = {v: k for k, v in tokenizer.vocab.items()}
+            toks = [
+                [
+                    inverse_vocab[int(t)]
+                    .replace("Ġ", " ")
+                    .replace("▁", " ")
+                    .replace("\n", "\\n")
+                    for t in tok
+                ]
+                for tok in toks
+            ]
+            highlighted_text = []
+            highlighted_text.append(
+                """
+        <body style="background-color: black; color: white;">
+        """
+            )
+            max_value = max([max(activ) for activ in activations])
+            min_value = min([min(activ) for activ in activations])
+            # Add color bar
+            highlighted_text.append(
+                "Token Activations: " + make_colorbar(min_value, max_value)
+            )
 
-            max_act = activations.max()
-            _threshold = max_act * threshold
+            highlighted_text.append('<div style="margin-top: 0.5em;"></div>')
+            for seq_ind, (act, tok) in enumerate(zip(activations, toks)):
+                for act_ind, (a, t) in enumerate(zip(act, tok)):
+                    text_color, background_color = value_to_color(
+                        a, max_value, min_value
+                    )
+                    highlighted_text.append(
+                        f'<span style="background-color:{background_color};'
+                        f'margin-right: {text_spacing}; color:rgb({text_color})"'
+                        f">{escape(t)}</span>"
+                    )  # noqa: E501
+                highlighted_text.append('<div style="margin-top: 0.2em;"></div>')
+            highlighted_text = "".join(highlighted_text)
+            return highlighted_text
 
-            while i < len(tokens):
-                if activations[i] > _threshold:
-                    result.append("<mark>")
-                    while i < len(tokens) and activations[i] > _threshold:
-                        result.append(tokens[i])
-                        i += 1
-                    result.append("</mark>")
-                else:
-                    result.append(tokens[i])
-                    i += 1
-                return "".join(result)
-            return ""
+        match example_source:
+            case "examples":
+                examples = self.examples
+            case "train":
+                examples = self.train
+            case "test":
+                examples = [x[0] for x in self.test]
+            case _:
+                raise ValueError(f"Unknown example source: {example_source}")
+        examples = examples[:n]
+        strings = _to_string(
+            [example.tokens for example in examples],
+            [example.activations for example in examples],
+        )
 
-        strings = [
-            _to_string(tokenizer.batch_decode(example.tokens), example.activations)
-            for example in self.examples[:n]
-        ]
+        if do_display:
+            from IPython.display import HTML, display
 
-        display(HTML("<br><br>".join(strings)))
+            display(HTML(strings))
+        else:
+            return strings
+
+
+def make_colorbar(
+    min_value,
+    max_value,
+    white=255,
+    red_blue_ness=250,
+    positive_threshold=0.01,
+    negative_threshold=0.01,
+):
+    # Add color bar
+    colorbar = ""
+    num_colors = 4
+    if min_value < -negative_threshold:
+        for i in range(num_colors, 0, -1):
+            ratio = i / (num_colors)
+            value = round((min_value * ratio), 1)
+            text_color = "255,255,255" if ratio > 0.5 else "0,0,0"
+            colorbar += f'<span style="background-color:rgba(255, {int(red_blue_ness-(red_blue_ness*ratio))},{int(red_blue_ness-(red_blue_ness*ratio))},1); color:rgb({text_color})">&nbsp{value}&nbsp</span>'  # noqa: E501
+    # Do zero
+    colorbar += f'<span style="background-color:rgba({white},{white},{white},1);color:rgb(0,0,0)">&nbsp0.0&nbsp</span>'  # noqa: E501
+    # Do positive
+    if max_value > positive_threshold:
+        for i in range(1, num_colors + 1):
+            ratio = i / (num_colors)
+            value = round((max_value * ratio), 1)
+            text_color = "255,255,255" if ratio > 0.5 else "0,0,0"
+            colorbar += f'<span style="background-color:rgba({int(red_blue_ness-(red_blue_ness*ratio))},{int(red_blue_ness-(red_blue_ness*ratio))},255,1);color:rgb({text_color})">&nbsp{value}&nbsp</span>'  # noqa: E501
+    return colorbar
+
+
+def value_to_color(
+    activation,
+    max_value,
+    min_value,
+    white=255,
+    red_blue_ness=250,
+    positive_threshold=0.01,
+    negative_threshold=0.01,
+):
+    if activation > positive_threshold:
+        ratio = activation / max_value
+        text_color = "0,0,0" if ratio <= 0.5 else "255,255,255"
+        background_color = f"rgba({int(red_blue_ness-(red_blue_ness*ratio))},{int(red_blue_ness-(red_blue_ness*ratio))},255,1)"  # noqa: E501
+    elif activation < -negative_threshold:
+        ratio = activation / min_value
+        text_color = "0,0,0" if ratio <= 0.5 else "255,255,255"
+        background_color = f"rgba(255, {int(red_blue_ness-(red_blue_ness*ratio))},{int(red_blue_ness-(red_blue_ness*ratio))},1)"  # noqa: E501
+    else:
+        text_color = "0,0,0"
+        background_color = f"rgba({white},{white},{white},1)"
+    return text_color, background_color
+
+
+def convert_token_array_to_list(array):
+    if isinstance(array, torch.Tensor):
+        if array.dim() == 1:
+            array = [array.tolist()]
+        elif array.dim() == 2:
+            array = array.tolist()
+        else:
+            raise NotImplementedError("tokens must be 1 or 2 dimensional")
+    elif isinstance(array, list):
+        # ensure it's a list of lists
+        if isinstance(array[0], int):
+            array = [array]
+        if isinstance(array[0], torch.Tensor):
+            array = [t.tolist() for t in array]
+    return array
+
+
+def escape(t):
+    t = (
+        t.replace(" ", "&nbsp;")
+        .replace("<bos>", "BOS")
+        .replace("<", "&lt;")
+        .replace(">", "&gt;")
+    )
+    return t

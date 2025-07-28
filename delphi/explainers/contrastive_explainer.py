@@ -3,11 +3,9 @@ from dataclasses import dataclass
 
 import torch
 
-from delphi.delphi.explainers.default.prompts import SYSTEM_CONTRASTIVE
-from delphi.delphi.explainers.explainer import Explainer, ExplainerResult
-from delphi.delphi.latents.latents import( 
-    ActivatingExample, LatentRecord, NonActivatingExample
-)
+from delphi.explainers.default.prompts import SYSTEM_CONTRASTIVE
+from delphi.explainers.explainer import Explainer, ExplainerResult, Response
+from delphi.latents.latents import ActivatingExample, LatentRecord, NonActivatingExample
 
 
 @dataclass
@@ -56,9 +54,13 @@ class ContrastiveExplainer(Explainer):
         )
 
         try:
-            explanation = self.parse_explanation(response.text)
+            if isinstance(response, Response):
+                response_text = response.text
+            else:
+                response_text = response
+            explanation = self.parse_explanation(response_text)
             if self.verbose:
-                from ..logger import logger
+                from delphi import logger
 
                 logger.info(f"Explanation: {explanation}")
                 logger.info(f"Messages: {messages[-1]['content']}")
@@ -66,7 +68,7 @@ class ContrastiveExplainer(Explainer):
 
             return ExplainerResult(record=record, explanation=explanation)
         except Exception as e:
-            from ..logger import logger
+            from delphi import logger
 
             logger.error(f"Explanation parsing failed: {repr(e)}")
             return ExplainerResult(
