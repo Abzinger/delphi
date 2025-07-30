@@ -2,8 +2,8 @@ import asyncio
 from abc import ABC
 from dataclasses import dataclass
 
-from delphi.explainers.explainer import ExplainerResult
-from delphi.latents.latents import ActivatingExample, LatentRecord
+from delphi.delphi.explainers.explainer import ExplainerResult
+from delphi.delphi.latents.latents import ActivatingExample, LatentRecord
 
 
 @dataclass

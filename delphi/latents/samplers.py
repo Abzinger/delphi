@@ -6,7 +6,7 @@ from transformers import (
     PreTrainedTokenizerFast,
 )
 
-from delphi import logger
+from delphi.delphi import logger
 
 from ..config import SamplerConfig
 from .latents import ActivatingExample, LatentRecord

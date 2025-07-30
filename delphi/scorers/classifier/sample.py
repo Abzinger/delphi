@@ -4,7 +4,7 @@ from typing import NamedTuple
 
 import torch
 
-from delphi import logger
+from delphi.delphi import logger
 
 from ...latents import ActivatingExample, NonActivatingExample
 
