@@ -118,6 +118,9 @@ class NonActivatingExample(Example):
     Defaults to -1.0 if not using neighbours.
     """
 
+    normalized_activations: Optional[Float[Tensor, "ctx_len"]] = None
+    """Activations quantized to integers in [0, 10]."""
+
 
 @dataclass
 class LatentRecord:
