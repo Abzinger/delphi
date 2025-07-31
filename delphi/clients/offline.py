@@ -50,6 +50,7 @@ class Offline(Client):
         num_gpus: int = 2,
         enforce_eager: bool = False,
         statistics: bool = False,
+        statistics_base_path: Path | None = None,
     ):
         """Client for offline generation. Models not already present in the on-disk
         HuggingFace cache will be downloaded. Note that temperature must be increased
@@ -73,7 +74,10 @@ class Offline(Client):
         self.statistics = statistics
 
         if self.statistics:
-            self.statistics_path = Path("statistics")
+            if statistics_base_path is not None:
+                self.statistics_path = statistics_base_path / "statistics"
+            else:
+                self.statistics_path = Path("statistics")
             self.statistics_path.mkdir(parents=True, exist_ok=True)
 
     async def process_func(
