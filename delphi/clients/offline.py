@@ -72,6 +72,7 @@ class Offline(Client):
         self.tokenizer = AutoTokenizer.from_pretrained(model)
         self.batch_size = batch_size
         self.statistics = statistics
+        self.statistics_base_path = statistics_base_path
 
         if self.statistics:
             if statistics_base_path is not None:
@@ -140,7 +141,7 @@ class Offline(Client):
                 statistics[i].prompt = batches[i][-1]["content"]  # type: ignore
                 statistics[i].response = r.outputs[0].text
                 with open(
-                    f"statistics/{hash(batches[i][-1]['content'][-100:])}.json", "w"  # type: ignore
+                    self.statistics_base_path / f"statistics/{hash(batches[i][-1]['content'][-100:])}.json", "w"  # type: ignore
                 ) as f:
                     json.dump(statistics[i].__dict__, f, indent=4)
             new_response.append(
