@@ -121,7 +121,19 @@ class NonActivatingExample(Example):
     normalized_activations: Optional[Float[Tensor, "ctx_len"]] = None
     """Activations quantized to integers in [0, 10]."""
 
-
+def to_serializable(obj):
+        if isinstance(obj, torch.Tensor):
+            return obj.tolist()
+        elif isinstance(obj, (ActivatingExample, NonActivatingExample, Example, Latent, Neighbour)):
+            # Convert dataclass to dict and recursively serialize
+            return {k: to_serializable(v) for k, v in obj.__dict__.items()}
+        elif isinstance(obj, list):
+            return [to_serializable(v) for v in obj]
+        elif isinstance(obj, dict):
+            return {k: to_serializable(v) for k, v in obj.items()}
+        else:
+            return obj
+#^()
 @dataclass
 class LatentRecord:
     """
@@ -187,6 +199,7 @@ class LatentRecord:
             serializable.pop("test")
 
         serializable.pop("latent")
+        serializable = to_serializable(serializable)
         with bf.BlobFile(path, "wb") as f:
             f.write(orjson.dumps(serializable))
 
