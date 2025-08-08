@@ -167,7 +167,8 @@ def load_data(scores_path: Path, modules: list[str]):
         return pd.DataFrame(
             [
                 {
-                    "text": "".join(ex["str_tokens"]),
+                    #"text": "".join(ex["str_tokens"]),
+                    "text": ex["str_tokens"],
                     "distance": ex["distance"],
                     "activating": ex["activating"],
                     "prediction": ex["prediction"],
