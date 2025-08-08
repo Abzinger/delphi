@@ -75,7 +75,7 @@ class FuzzingScorer(Classifier, Scorer):
                 tokens=example.tokens,
                 activations=example.activations,
                 str_tokens=example.str_tokens,
-                normalized_activations=example.normalized_activations,
+                # normalized_activations=example.normalized_activations,
                 distance=-1,
             )
             for example in examples
